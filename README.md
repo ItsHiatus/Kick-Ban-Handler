@@ -1,6 +1,5 @@
 # Kick-Ban-Handler
 Handles player banning/kicking (server only)
--- Handles player banning/kicking
 
 How to use:
 
