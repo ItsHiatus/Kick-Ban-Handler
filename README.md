@@ -8,9 +8,11 @@ Moderators must be added to to Moderator list (Name or UserId)
 Must use Resolver.VerifyGameAccess() when a player joins to check if they're banned or not
 	
 	Resolver.VerifyGameAccess(user : number|Player): boolean --> Checks if user has access to the game (false = banned)
+	
 		Note: 'user' must be a UserId or Player object
 		
 	Resolver.Note(user : number|Player, note : string, moderator : string|Player)
+	
 		Note: 'user' must be a UserId or Player object
 		      'moderator' must be a string or Player object
 		
