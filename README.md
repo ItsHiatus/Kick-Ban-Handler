@@ -21,9 +21,10 @@ How to use:
 			=> [sus]    "Suspicious activity detected:" .. reason
 			=> [nil]    reason (no extra message)
 	
-	Resolver.Ban(user : number|Player, moderator : string|Player, reason : string?)
+	Resolver.Ban(user : number|Player, moderator : string|Player, duration : number, reason : string?)
 		Note: 'user' must be a UserId or Player object
 		      'moderator' must be a string or Player object
+		      'duration' is in seconds (set to -1 for indefinite)
 		      'reason' will default to "None" when nil (can be changed)
 			
 	Resolver.Unban(id : number, moderator : string|Player, reason : string?)
@@ -35,3 +36,4 @@ Notes:
 
 - Moderators must be added to to Moderator list (Name or UserId)
 - You must use Resolver.VerifyGameAccess() when a player joins to check if they're banned or not
+- Ban duration is in seconds. For indefinite bans, set the duration to -1.
