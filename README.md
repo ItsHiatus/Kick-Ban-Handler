@@ -31,6 +31,11 @@ How to use:
 		Note: 'id' must be a UserId
 		      'moderator' must be a string or Player object
 		      'reason' will default to "No reason given" when nil
+		      
+	Resolver.GetLogs(user : number|Player, category : string?)
+		Note: 'user' must be a UserId or Player object
+		      'category' lets you choose which category of logs you want to see ("Notes" | "Bans" | "Kicks")
+		       leaving 'category' as nil will return logs all categories
 
 Notes:
 
