@@ -9,13 +9,16 @@ local KickTypes = {
 	sus = "Suspicious activity detected: %s."
 }
 
-local Moderators = {
+local Moderators : {[string|number] : string} = {
+	Im_Hiatus = "Im_Hiatus",
 	[12545525] = "Im_Hiatus"
 }
 
+local DEFAULT_KICK_REASON = "None"
+local DEFAULT_BAN_REASON = "None"
 local MAX_FETCH_ATTEMPTS = 10
 
-local function GetId(user : Player | number) : number?
+local function GetId(user : Player|number) : number?
 	local id : number = if typeof(user) == "Instance" and user:IsA("Player") then user.UserId else user
 	
 	if type(id) == "number" then
@@ -25,15 +28,21 @@ local function GetId(user : Player | number) : number?
 	end
 end
 
-local function VerifyModerator(moderator : Player | number) : boolean
-	if not moderator then warn("Must send a user! (Sent nil)") return false end
+local function IsModerator(moderator : string|Player) : string|boolean
+	if not moderator then warn("Must send a player! (Sent nil)") return false end
 	
-	local id = GetId(moderator)
-	if not id or not Moderators[id] then
-		return false, string.format("%d does not have permission to kick/ban users!", id or 0)
+	local mod
+	if typeof(moderator) == "Instance" and moderator:IsA("Player") then
+		mod = moderator.Name
+	elseif typeof(moderator) == "string" then
+		mod = moderator
 	end
 	
-	return true
+	if not mod or not Moderators[mod] then
+		return false, string.format("%s does not have permission to kick/ban users!", mod or "__nil")
+	end
+	
+	return mod
 end
 
 local function FetchData(userId : number, datastore : DataStore) : {[any] : any}?
@@ -49,8 +58,9 @@ local function FetchData(userId : number, datastore : DataStore) : {[any] : any}
 			return datastore:GetAsync(tostring(userId))
 		end)
 	end
-
-	return (success and result) or warn("Failed to retrieve data from Roblox servers. Please try again later. Problem:", result)
+	
+	if not success then warn("Failed to retrieve data from Roblox servers. Please try again later. Problem:", result) end
+	return success and result or nil
 end
 
 local function WriteToData(userId: number, datastore : DataStore, data : {any}) : boolean
@@ -68,14 +78,18 @@ local function WriteToData(userId: number, datastore : DataStore, data : {any}) 
 			end)
 		end)
 	end
-
-	return success or false, warn("Failed to update data on Roblox servers. Please try again later. Problem:", msg)
+	
+	if not success then warn("Failed to update data on Roblox servers. Please try again later. Problem:", msg) end
+	return success
 end
 
 local Resolver = {}
 
-function Resolver.Note(user : Player | number, note : string, noter : (Player | number)?)
-	if not user then warn("Must send a user! (Sent nil)") return end
+function Resolver.Note(user : number|Player, note : string, moderator : string|Player)
+	if not note or typeof(note) ~= "string" then warn("Must send a valid note! Sent:", note) return end
+	
+	local mod = IsModerator(moderator)
+	if not mod then return end
 	
 	local id = GetId(user)
 	if not id then return end
@@ -84,39 +98,49 @@ function Resolver.Note(user : Player | number, note : string, noter : (Player | 
 	table.insert(data, 1, {
 		Date = os.date(),
 		Note = note,
-		Noter = noter or debug.traceback()
+		Moderator = mod :: string,
+		Traceback = debug.traceback()
 	})
 	
 	WriteToData(id :: number, PlayerNotes, data)
 end
 
-function Resolver.Kick(player : Player, reason : string, format : string)
+function Resolver.Kick(player : Player, moderator : string|Player, reason : string?, format : string?)
 	if not player or typeof(player) ~= "Instance" or not player:IsA("Player") then
 		warn("Must send a player! Sent:", player) return
 	end
 	
+	local mod = IsModerator(moderator)
+	if not mod then return end
+	
+	reason = reason or DEFAULT_KICK_REASON
+	
 	local data = FetchData(player.UserId, KickedPlayers) or {}
 	table.insert(data, 1, {
 		Date = os.date(),
-		Reason = string.format("%s (%s)", reason, format),
-		Traceback = debug.traceback()
+		Reason = string.format("%s (%s)", reason :: string, format or "General"),
+		Moderator = mod,
 	})
 
 	WriteToData(player.UserId, KickedPlayers, data)
-	player:Kick(string.format(KickTypes[format] or "%s", reason))
+	player:Kick(string.format(KickTypes[format] or "%s", reason :: string))
 end
 
-function Resolver.Ban(user : Player | number, moderator : Player, reason : string)
+function Resolver.Ban(user : number|Player, moderator : string|Player, reason : string?)
 	if not user then warn("Must send a user! (Sent nil)") return end
-	if not VerifyModerator(moderator) then return end
+	
+	local mod = IsModerator(moderator)
+	if not mod then return end
 	
 	local id = GetId(user)
 	if not id then return end
 	
+	reason = DEFAULT_BAN_REASON
+	
 	WriteToData(id :: number, BannedPlayers, {
 		Banned = true,
-		Reason = reason or "No reason given",
-		Moderator = moderator.Name,
+		Reason = reason,
+		Moderator = mod,
 		Date = os.date()
 	})
 	
@@ -125,19 +149,21 @@ function Resolver.Ban(user : Player | number, moderator : Player, reason : strin
 	end
 end
 
-function Resolver.Unban(id : number, moderator : Player, reason : string)
+function Resolver.Unban(id : number, moderator : string|Player, reason : string)
 	if type(id) ~= "number" then warn("Must send a UserId") return end
-	if not VerifyModerator(moderator) then return end
+	
+	local mod = IsModerator(moderator)
+	if not mod then return end
 	
 	WriteToData(id, BannedPlayers, {
 		Banned = false,
 		Reason = reason or "No reason given",
-		Moderator = moderator.Name,
+		Moderator = mod,
 		Date = os.date()
 	})
 end
 
-function Resolver.VerifyGameAccess(user : Player | number) : boolean
+function Resolver.VerifyGameAccess(user : number|Player) : boolean
 	if not user then warn("Must send a user! (Sent nil)") return false end
 	
 	local id = GetId(user)
