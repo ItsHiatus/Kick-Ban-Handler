@@ -3,8 +3,8 @@ Handles player banning/kicking/noting (server only)
 
 How to use:
 	
-Moderators must be added to to Moderator list (Name or UserId)
-Must use Resolver.VerifyGameAccess() when a player joins to check if they're banned or not
+- Moderators must be added to to Moderator list (Name or UserId)
+- Must use Resolver.VerifyGameAccess() when a player joins to check if they're banned or not
 	
 	Resolver.VerifyGameAccess(user : number|Player): boolean --> Checks if user has access to the game (false = banned)
 		Note: 'user' must be a UserId or Player object
