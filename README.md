@@ -1,24 +1,26 @@
-# Kick-Ban-Handler
-Handles player banning/kicking (server only)
+# Kick-Ban-Note-Handler
+Handles player banning/kicking/noting (server only)
 
 How to use:
 
-	Resolver.VerifyAccess(player): boolean --> Checks if player has access to the game (false = banned)
-
-	Resolver.Kick(player, reason, format?) --> Kicks a player, saving the reason and date in newest slot
+	Resolver.VerifyGameAccess(player | userId): boolean --> Checks if player has access to the game (false = banned)
+	
+		Note: Accepts a Player or UserId.
+		
+	Resolver.Kick(player, moderator : player | userId | nil, reason, format?) --> Kicks a player, saving the reason and date
 			
-		Note: 'format' defines the reason for the kick (error/suspicious).
+		Note: 'moderator' can be a Player or UserId
+		      'format' defines the reason for the kick (error/suspicious).
 		       Each format has a different message, coupled with the reason:
 
 			=> [error]  reason .. "If this problem persists, please contact support."
 			=> [sus]    "Suspicious activity detected:" .. reason
 			=> [nil]    reason (no extra message)
 	
-	Resolver.Ban(user: Player|number, reason) --> Bans a user, saving the reason and date.
+	Resolver.Ban(player | userId, reason) --> Bans a user, saving the reason and date.
+	
+		Note: Must use Resolver.VerifyGameAccess() when the player joins to check if they're banned or not
 			
-		Note: Accepts a Player instance or UserId for first arg. 
-		      Must use Resolver.Verify() when the player joins to check if they're banned or not
-			
-	Resolver.Unban(user: Player|number, reason) --> Unbans a user, saving the reason and date.
-			
-		Note: Accepts a Player instance or UserId for first arg.
+	Resolver.Unban(player | userId, reason) --> Unbans a user, saving the reason and date.
+	
+	Resolver.Note(player | userId, reason) --> Writes a note on the user
