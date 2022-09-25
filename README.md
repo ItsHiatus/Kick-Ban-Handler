@@ -33,6 +33,5 @@ How to use:
 
 Notes:
 
-Moderators must be added to to Moderator list (Name or UserId)
-
-Must use Resolver.VerifyGameAccess() when a player joins to check if they're banned or not
+- Moderators must be added to to Moderator list (Name or UserId)
+- You must use Resolver.VerifyGameAccess() when a player joins to check if they're banned or not
