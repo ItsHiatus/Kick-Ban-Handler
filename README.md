@@ -3,16 +3,10 @@ Handles player banning/kicking/noting (server only)
 
 How to use:
 	
-Moderators must be added to to Moderator list (Name or UserId)
-
-Must use Resolver.VerifyGameAccess() when a player joins to check if they're banned or not
-	
 	Resolver.VerifyGameAccess(user : number|Player): boolean --> Checks if user has access to the game (false = banned)
-	
 		Note: 'user' must be a UserId or Player object
 		
 	Resolver.Note(user : number|Player, note : string, moderator : string|Player)
-	
 		Note: 'user' must be a UserId or Player object
 		      'moderator' must be a string or Player object
 		
@@ -36,3 +30,8 @@ Must use Resolver.VerifyGameAccess() when a player joins to check if they're ban
 		Note: 'id' must be a UserId
 		      'moderator' must be a string or Player object
 		      'reason' will default to "No reason given" when nil
+
+Notes:
+Moderators must be added to to Moderator list (Name or UserId)
+
+Must use Resolver.VerifyGameAccess() when a player joins to check if they're banned or not
