@@ -15,11 +15,11 @@ How to use:
 			      => [sus]    "Suspicious activity detected:" .. reason
 			      => [nil]    reason (no extra message)
 	
-	Resolver.Ban(user: Instance|number, reason) --> Bans a user, saving the reason and date.
+	Resolver.Ban(user: Player|number, reason) --> Bans a user, saving the reason and date.
 			
 			Note: Accepts a Player instance or UserId for first arg. 
 			      Must use Resolver.Verify() when the player joins to check if they're banned or not
 			
-	Resolver.Unban(user: Instance|number, reason) --> Unbans a user, saving the reason and date.
+	Resolver.Unban(user: Player|number, reason) --> Unbans a user, saving the reason and date.
 			
 			Note: Accepts a Player instance or UserId for first arg.
