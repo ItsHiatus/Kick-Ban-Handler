@@ -32,6 +32,7 @@ How to use:
 		      'reason' will default to "No reason given" when nil
 
 Notes:
+
 Moderators must be added to to Moderator list (Name or UserId)
 
 Must use Resolver.VerifyGameAccess() when a player joins to check if they're banned or not
