@@ -15,7 +15,7 @@ Resolver.Note(user : number|Player, note : string, moderator : string|Player)
 
 ```lua
 Resolver.Kick(player : Player, moderator : string|Player, reason : string?, format : string?)
---[[	Note:  Must pass a Player object
+--[[	 Must pass a Player object
 	'moderator' must be a UserId or Player object
 	'reason' will default to "None" when nil (can be changed)
 	'format' defines the source of the kick (error/suspicious)
@@ -29,34 +29,37 @@ Resolver.Kick(player : Player, moderator : string|Player, reason : string?, form
 
 ```lua
 Resolver.Ban(user : number|Player, moderator : string|Player, duration : number, reason : string?)
-		Note: 'user' must be a UserId or Player object
-		      'moderator' must be a string or Player object
-		      'duration' is in seconds (set to -1 for indefinite)
-		      'reason' will default to "None" when nil (can be changed)
+--[[	'user' must be a UserId or Player object
+	'moderator' must be a string or Player object
+	'duration' is in seconds (set to -1 for indefinite)
+	'reason' will default to "None" when nil (can be changed)
+]]--
 ```
 
 ```lua
 Resolver.Unban(id : number, moderator : string|Player, reason : string?)
-		Note: 'id' must be a UserId
-		      'moderator' must be a string or Player object
-		      'reason' will default to "No reason given" when nil
+--[[	'id' must be a UserId
+	'moderator' must be a string or Player object
+	'reason' will default to "No reason given" when nil
+]]--
 ```
 
 ```lua
 Resolver.GetLogs(user : number|Player, category : string?)
-		Note: 'user' must be a UserId or Player object
-		      'category' lets you choose which category of logs you want to see ("Notes" | "Bans" | "Kicks")
-		       leaving 'category' as nil will return logs all categories
+--[[	'user' must be a UserId or Player object
+	'category' lets you choose which category of logs you want to see ("Notes" | "Bans" | "Kicks")
+	 leaving 'category' as nil will return logs all categories
+]]--
 ```
 
 ```lua		       
 Resolver.AddModerator(moderator : string|number|Player)
-		Note: 'moderator' must be a Name, UserId or Player object
+--	'moderator' must be a Name, UserId or Player object
 ```
 
 ```lua
 Resolver.RemoveModerator(moderator : string|number|Player)
-		Note: 'moderator' must be a Name, UserId or Player object
+--	'moderator' must be a Name, UserId or Player object
 ```
 Notes:
 
