@@ -93,30 +93,30 @@ local function WriteToData(userId: number, datastore : DataStore, data : {any}) 
 	return success
 end
 
-local Resolver = {}
+local Moderation = {}
 
-function Resolver.AddModerator(moderator : string|number|Player)
+function Moderation.AddModerator(moderator : string|number|Player)
 	if not moderator then warn("Must send a valid user! Sent:", moderator) return end
-	
+
 	if typeof(moderator) == "string" or typeof(moderator) == "number" then
 		Moderators[moderator] = tostring(moderator)
 	elseif typeof(moderator) == "Instance" then
 		local id = GetId(moderator)
 		if not id then return end
-		
+
 		Moderators[id :: number] = moderator.Name
 	end
 end
 
-function Resolver.RemoveModerator(moderator : string|number|Player)
+function Moderation.RemoveModerator(moderator : string|number|Player)
 	if not moderator then warn("Must send a valid user! Sent:", moderator) return end
-	
+
 	local id = if typeof(moderator) == "Instance" then GetId(moderator) else moderator
-	
+
 	Moderators[id :: string|number] = nil
 end
 
-function Resolver.Note(user : number|Player, note : string, moderator : string|Player)
+function Moderation.Note(user : number|Player, note : string, moderator : string|Player)
 	if not note or typeof(note) ~= "string" then warn("Must send a valid note! Sent:", note) return end
 
 	local mod = IsModerator(moderator)
@@ -136,10 +136,10 @@ function Resolver.Note(user : number|Player, note : string, moderator : string|P
 	WriteToData(id :: number, PlayerNotes, notes)
 end
 
-function Resolver.GetLogs(user : number|Player, category : LogCategory?)
+function Moderation.GetLogs(user : number|Player, category : LogCategory?)
 	local id = GetId(user)
 	if not id then return end
-	
+
 	if category == "Notes" then
 		return FetchData(id :: number, PlayerNotes) or {}
 	elseif category == "Kicks" then
@@ -155,7 +155,7 @@ function Resolver.GetLogs(user : number|Player, category : LogCategory?)
 	end
 end
 
-function Resolver.Kick(player : Player, moderator : string|Player, reason : string?, format : string?)
+function Moderation.Kick(player : Player, moderator : string|Player, reason : string?, format : string?)
 	if not player or typeof(player) ~= "Instance" or not player:IsA("Player") then
 		warn("Must send a player! Sent:", player) return
 	end
@@ -177,22 +177,22 @@ function Resolver.Kick(player : Player, moderator : string|Player, reason : stri
 	player:Kick(string.format(KickTypes[format] or "%s", reason :: string))
 end
 
-function Resolver.Ban(user : number|Player, moderator : string|Player, duration : number, reason : string?)
+function Moderation.Ban(user : number|Player, moderator : string|Player, duration : number, reason : string?)
 	-- duration : seconds
 	if not user then warn("Must send a user! (Sent nil)") return end
 	if not duration or type(duration) ~= "number" then warn("Duration must be a number! Sent:", duration) return end
-	
+
 	local mod = IsModerator(moderator)
 	if not mod then return end
 
 	local id = GetId(user)
 	if not id then return end
-	
+
 	reason = reason or DEFAULT_BAN_REASON
-	
+
 	local ban_logs : {any} = FetchData(id :: number, BannedPlayers) or {}
 	if ban_logs[1] and ban_logs[1].Banned then warn(user, "already banned!") return end
-	
+
 	table.insert(ban_logs, 1, {
 		Banned = true,
 		Date = os.date(),
@@ -202,7 +202,7 @@ function Resolver.Ban(user : number|Player, moderator : string|Player, duration 
 		TimeOfBan = os.time(),
 		Duration = math.round(duration),
 	})
-	
+
 	WriteToData(id :: number, BannedPlayers, ban_logs)
 
 	if typeof(user) == "Instance" and user:IsA("Player") then
@@ -210,14 +210,14 @@ function Resolver.Ban(user : number|Player, moderator : string|Player, duration 
 	end
 end
 
-function Resolver.Unban(id : number, moderator : string|Player, reason : string?)
+function Moderation.Unban(id : number, moderator : string|Player, reason : string?)
 	if type(id) ~= "number" then warn("Must send a UserId") return end
 
 	local mod = IsModerator(moderator)
 	if not mod then return end
-	
+
 	reason = reason or DEFAULT_UNBAN_REASON
-	
+
 	local ban_logs = FetchData(id :: number, BannedPlayers) or {}
 	table.insert(ban_logs, 1, {
 		Banned = false,
@@ -226,11 +226,11 @@ function Resolver.Unban(id : number, moderator : string|Player, reason : string?
 		Moderator = mod,
 		Traceback = debug.traceback()
 	})
-	
+
 	WriteToData(id :: number, BannedPlayers, ban_logs)
 end
 
-function Resolver.VerifyGameAccess(user : number|Player) : boolean
+function Moderation.VerifyGameAccess(user : number|Player) : boolean
 	if not user then warn("Must send a user! (Sent nil)") return false end
 
 	local id = GetId(user)
@@ -238,11 +238,11 @@ function Resolver.VerifyGameAccess(user : number|Player) : boolean
 
 	local ban_logs = FetchData(id :: number, BannedPlayers)
 	local latest_log = ban_logs and ban_logs[1]
-	
+
 	if not latest_log or not latest_log.Banned then
 		return true
 	elseif latest_log.Duration > 0 and os.time() > latest_log.TimeOfBan + latest_log.Duration then
-		Resolver.Unban(id :: number, "Server", "Ban duration finished")
+		Moderation.Unban(id :: number, "Server", "Ban duration finished")
 		return true
 	elseif typeof(user) == "Instance" and user:IsA("Player") then
 		user:Kick(string.format("You are banned from this experience. Reason: %s", latest_log.Reason))
@@ -251,4 +251,4 @@ function Resolver.VerifyGameAccess(user : number|Player) : boolean
 	return false
 end
 
-return Resolver
+return Moderation
