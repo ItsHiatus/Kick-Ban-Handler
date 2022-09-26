@@ -1,4 +1,4 @@
-# Kick-Ban-Note-Handler
+# Moderation Handler
 Handles player banning/kicking/noting (server only)
 
 How to use:
