@@ -4,12 +4,12 @@ Handles player banning/kicking/noting (server only)
 API:
 ```lua
 Resolver.VerifyGameAccess(user : number|Player): boolean --> Checks if user has access to the game (false = banned)
---Note: 'user' must be a UserId or Player object
+--	'user' must be a UserId or Player object
 ```
 
 ```lua
 Resolver.Note(user : number|Player, note : string, moderator : string|Player)
---Note: 'user' must be a UserId or Player object
+--	'user' must be a UserId or Player object
 --	'moderator' must be a string or Player object
 ```
 
