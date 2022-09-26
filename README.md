@@ -36,6 +36,12 @@ How to use:
 		Note: 'user' must be a UserId or Player object
 		      'category' lets you choose which category of logs you want to see ("Notes" | "Bans" | "Kicks")
 		       leaving 'category' as nil will return logs all categories
+		       
+	Resolver.AddModerator(moderator : string|number|Player)
+		Note: 'moderator' must be a Name, UserId or Player object
+	
+	Resolver.RemoveModerator(moderator : string|number|Player)
+		Note: 'moderator' must be a Name, UserId or Player object
 
 Notes:
 
