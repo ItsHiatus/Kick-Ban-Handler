@@ -95,6 +95,27 @@ end
 
 local Resolver = {}
 
+function Resolver.AddModerator(moderator : string|number|Player)
+	if not moderator then warn("Must send a valid user! Sent:", moderator) return end
+	
+	if typeof(moderator) == "string" or typeof(moderator) == "number" then
+		Moderators[moderator] = tostring(moderator)
+	elseif typeof(moderator) == "Instance" then
+		local id = GetId(moderator)
+		if not id then return end
+		
+		Moderators[id :: number] = moderator.Name
+	end
+end
+
+function Resolver.RemoveModerator(moderator : string|number|Player)
+	if not moderator then warn("Must send a valid user! Sent:", moderator) return end
+	
+	local id = if typeof(moderator) == "Instance" then GetId(moderator) else moderator
+	
+	Moderators[id :: string|number] = nil
+end
+
 function Resolver.Note(user : number|Player, note : string, moderator : string|Player)
 	if not note or typeof(note) ~= "string" then warn("Must send a valid note! Sent:", note) return end
 
