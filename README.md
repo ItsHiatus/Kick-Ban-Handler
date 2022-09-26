@@ -10,7 +10,7 @@ Resolver.VerifyGameAccess(user : number|Player): boolean --> Checks if user has 
 ```lua
 Resolver.Note(user : number|Player, note : string, moderator : string|Player)
 --Note: 'user' must be a UserId or Player object
-	'moderator' must be a string or Player object
+--	'moderator' must be a string or Player object
 ```
 
 	Resolver.Kick(player : Player, moderator : string|Player, reason : string?, format : string?)
