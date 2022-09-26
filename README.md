@@ -1,6 +1,12 @@
 # Moderation Handler
 Handles player banning/kicking/noting (server only)
 
+Important Notes:
+
+- Moderators must be added to to Moderator list (Name or UserId)
+- You must use Resolver.VerifyGameAccess() when a player joins to check if they're banned or not
+- Ban duration is in seconds. For indefinite bans, set the duration to -1.
+
 API:
 ```lua
 Resolver.VerifyGameAccess(user : number|Player): boolean --> Checks if user has access to the game (false = banned)
@@ -61,8 +67,3 @@ Resolver.AddModerator(moderator : string|number|Player)
 Resolver.RemoveModerator(moderator : string|number|Player)
 --	'moderator' must be a Name, UserId or Player object
 ```
-Notes:
-
-- Moderators must be added to to Moderator list (Name or UserId)
-- You must use Resolver.VerifyGameAccess() when a player joins to check if they're banned or not
-- Ban duration is in seconds. For indefinite bans, set the duration to -1.
