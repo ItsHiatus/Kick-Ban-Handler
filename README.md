@@ -3,7 +3,7 @@ Handles player banning/kicking/noting (server only)
 
 Important Notes:
 
-- Moderators must be added to to Moderator list (Name or UserId)
+- Moderators must be added to the Moderator list (Name or UserId)
 - You must use Moderation.VerifyGameAccess() when a player joins to check if they're banned or not
 - Ban duration is in seconds. For indefinite bans, set the duration to -1.
 
