@@ -1,7 +1,7 @@
 # Moderation Handler
 Handles player banning/kicking/noting (server only)
 
-How to use:
+API:
 	
 	Resolver.VerifyGameAccess(user : number|Player): boolean --> Checks if user has access to the game (false = banned)
 		Note: 'user' must be a UserId or Player object
