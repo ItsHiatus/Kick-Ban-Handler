@@ -25,7 +25,7 @@ local NOTES_DS_KEY = "Notes_1_"
 --
 
 type Data = {[any] : any}
-type List = {[string] : string}
+type List = {string}
 type Message = {Data : any, Sent : number}
 
 type User = Player | number
@@ -126,9 +126,9 @@ local function IsModerator(moderator : User) : string|boolean
 	if not Moderators then warn("Mod list has not been fetched yet (Call UpdateModerators())") return false end
 	if not moderator then warn("Must send a player! (Sent nil)") return false end
 
-	local id = tostring(GetId(moderator)) -- number keys are stored as strings in datastores
-	if id == "nil" or not Moderators[id] then
-		warn(string.format("%s does not have permission to kick/ban users!", id)) return false
+	local id = GetId(moderator) :: number
+	if not id or not Moderators[id] then
+		warn(string.format("%s does not have permission to kick/ban users!", tostring(id))) return false
 	end
 
 	return Moderators[id]
@@ -163,19 +163,19 @@ function Moderation.AddModerator(new_moderator : User, moderator : User)
 	local added_mods, fetch_success = FetchData(MODS_DS_KEY)
 	if not fetch_success then return end
 	
-	local id : string
+	local id : number
 	local name : string
 
 	if typeof(new_moderator) == "number" then
-		id = tostring(new_moderator)
-		name = id
+		id = new_moderator
+		name = tostring(id)
 
 		added_mods[id] = name
 		Moderators[id] = name
 
 	elseif typeof(new_moderator) == "Instance" then
-		id = tostring(GetId(new_moderator))
-		if not id or id == "nil" then return end
+		id = GetId(new_moderator) :: number
+		if not id then return end
 
 		name = new_moderator.Name
 
@@ -200,8 +200,8 @@ function Moderation.RemoveModerator(old_moderator : User, moderator : User)
 	local added_mods, fetch_success = FetchData(MODS_DS_KEY)
 	if not fetch_success then return end
 
-	local id = tostring(GetId(old_moderator))
-	if not id or id == "nil" then return end
+	local id = GetId(old_moderator) :: number
+	if not id then return end
 	if not Moderators[id] then warn(id, "is not a moderator!") return end
 
 	added_mods[id] = nil
@@ -221,8 +221,8 @@ function Moderation.UpdateModerators() : boolean?
 	local new_mod_list = {}
 
 	for id, name in pairs(DefaultModerators) do -- fill in the default mods (server setup)
-		if new_mod_list[tostring(id)] then continue end
-		new_mod_list[tostring(id)] = name
+		if new_mod_list[id] then continue end
+		new_mod_list[id] = name
 	end
 
 	local added_mods, fetch_success = FetchData(MODS_DS_KEY)
@@ -247,7 +247,7 @@ function Moderation.Note(user : User, moderator : User, note : string)
 	local mod = IsModerator(moderator)
 	if not mod then return end
 
-	local id = GetId(user)
+	local id = GetId(user) :: number
 	if not id then return end
 
 	local key = NOTES_DS_KEY .. tostring(id)
@@ -261,7 +261,7 @@ function Moderation.Note(user : User, moderator : User, note : string)
 	})
 
 	WriteToData(key, notes)
-	print(string.format("added note to %d", id :: number))
+	print(string.format("added note to %d", id))
 end
 
 function Moderation.GetLogs(user : User, moderator : User, category : LogCategory?)
@@ -293,7 +293,7 @@ function Moderation.Kick(user : User, moderator : User, reason : string?, format
 	local id = GetId(user)
 	if not id then return end
 	
-	reason = reason or DEFAULT_KICK_REASON
+	reason = reason or DEFAULT_KICK_REASON :: string
 	
 	local key = KICKS_DS_KEY .. tostring(id)
 	local kick_logs = FetchData(key)
@@ -308,7 +308,7 @@ function Moderation.Kick(user : User, moderator : User, reason : string?, format
 
 	local player = Players:GetPlayerByUserId(id)
 	if player then
-		player:Kick(string.format(KickMessageFormats[format] or "%s", reason :: string))
+		player:Kick(string.format(KickMessageFormats[format] or "%s", reason))
 		print(id, "has been kicked from the game")
 	else
 		print("finding player in other servers...")
