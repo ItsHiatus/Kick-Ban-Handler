@@ -40,7 +40,7 @@ Moderation.RemoveModerator(old_moderator : User, existing_moderator : User)
 ```
 
 ```lua
-Moderation.GetModerators() : {[string] : string}
+Moderation.GetModerators() : {[UserId] : string}
 ```
 
 ```lua
