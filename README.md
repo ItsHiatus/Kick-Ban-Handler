@@ -1,69 +1,83 @@
 # Moderation Handler
-Handles player banning/kicking/noting (server only)
+*Handles player banning/kicking/noting (server only)*
 
-Important Notes:
+### Important Notes:
+- You must call `Moderation.VerifyGameAccess(player)` on every player that joins. This ensures that banned players are kicked from the game, and players whose ban duration is up, are unbanned.
 
-- Moderators must be added to the Moderator list (Name or UserId)
-- You must use Moderation.VerifyGameAccess() when a player joins to check if they're banned or not
-- Ban duration is in seconds. For indefinite bans, set the duration to -1.
+- Moderators can be added by adding them to the DefaultModerator table or by using `Moderation.AddModerator()`
+			
+- To remove moderators, either remove them from the DefaultModerator list (if they were added there), or by calling `Moderation.RemoveModerator()`.
+				
+- `Moderation.UpdateModerators()` must be called at least once when the server starts. This is done for you at the bottom of the module.
+	
+- Ban duration unit is seconds. For indefinite bans, set the duration to -1.
+	
+- Make sure commands that write to datastores are not used on a particular User in a real game setting; otherwise, a lot of datastore requests will be made, doing the exact same thing.
 
-API:
-```lua
-Moderation.VerifyGameAccess(user : number|Player): boolean --> Checks if user has access to the game (false = banned)
---	'user' must be a UserId or Player object
+- Almost all commands require an existing moderator to authorise the function. The server is a default moderator with an Id of -1.
+
+### API:
+
+```
+-- Types --
+
+User : UserId|Player
+LogCategory : "Notes" | "Kicks" | "Bans"
+Format : "error" | "sus"
 ```
 
 ```lua
-Moderation.Note(user : number|Player, note : string, moderator : string|Player)
---	'user' must be a UserId or Player object
---	'moderator' must be a string or Player object
+Moderation.VerifyGameAccess(user : User): boolean
+--	Checks if user has access to the game (false = banned)
 ```
 
 ```lua
-Moderation.Kick(player : Player, moderator : string|Player, reason : string?, format : string?)
---[[	 Must pass a Player object
-	'moderator' must be a UserId or Player object
-	'reason' will default to "None" when nil (can be changed)
-	'format' defines the source of the kick (error/suspicious)
-	 Each format creates a new message with the reason:
-
-		=> [error]  reason .. "If this problem persists, please contact support."
-		=> [sus]    "Suspicious activity detected:" .. reason
-		=> [nil]    reason (no extra message)
-]]--
+Moderation.AddModerator(new_moderator : User, existing_moderator : User)
 ```
 
 ```lua
-Moderation.Ban(user : number|Player, moderator : string|Player, duration : number, reason : string?)
---[[	'user' must be a UserId or Player object
-	'moderator' must be a string or Player object
-	'duration' is in seconds (set to -1 for indefinite)
-	'reason' will default to "None" when nil (can be changed)
-]]--
+Moderation.RemoveModerator(old_moderator : User, existing_moderator : User)
 ```
 
 ```lua
-Moderation.Unban(id : number, moderator : string|Player, reason : string?)
---[[	'id' must be a UserId
-	'moderator' must be a string or Player object
-	'reason' will default to "No reason given" when nil
-]]--
+Moderation.GetModerators() : {[string] : string}
 ```
 
 ```lua
-Moderation.GetLogs(user : number|Player, category : string?)
---[[	'user' must be a UserId or Player object
-	'category' lets you choose which category of logs you want to see ("Notes" | "Bans" | "Kicks")
-	 leaving 'category' as nil will return logs all categories
-]]--
+Moderation.UpdateModerators()
+--	Resyncs the 'Moderators' table with the 'DefaultModerators' and the moderators added using Moderation.AddModerator()
+```
+
+```lua
+Moderation.GetLogs(user : User, moderator : User, category : LogCategory?)
+--	Returns a list of ordered logs (newest to oldest) for the specified category.
+--	If no category is specified, it will return a dictionary containing all ordered logs.
 ```
 
 ```lua		       
-Moderation.AddModerator(moderator : string|number|Player)
---	'moderator' must be a Name, UserId or Player object
+Moderation.Note(user : User, moderator : User, note : string)
 ```
 
 ```lua
-Moderation.RemoveModerator(moderator : string|number|Player)
---	'moderator' must be a Name, UserId or Player object
+Moderation.Kick(user : User, moderator : User, reason : string?, format : Format?)
+--[[	'reason' will default to "None" when nil (changeable)
+	'format' will reformat the reason to display a better kick message to the player.
+		This makes it easier to write descriptive kick messages:
+			- [error]  reason .. "If this problem persists, please contact support."
+			- [sus]    "Suspicious activity detected:" .. reason
+			- [nil]    reason (no extra message)
+							
+			(you can add more formats to the KickMessageFormat table)
+]]--
+```
+
+```lua
+Moderation.Ban(user : User, moderator : User, duration : number, reason : string?)
+--	'duration' is in seconds (set to -1 for indefinite)
+--	'reason' will default to "None" when nil (changeable)
+```
+
+```lua
+Moderation.Unban(id : number, moderator : User, reason : string?)
+--	'reason' will default to "No reason given" when nil
 ```
