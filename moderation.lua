@@ -1,122 +1,247 @@
 --!strict
 -- Credits to Hiatus/ApprenticeOfMadara
-type Note = {
-	Date : string,
-	Note : string,
-	Moderator : string,
-	Traceback : string
+-- Settings
+local DefaultModerators : {string} = {
+	[-1] = "Server", -- id -1 is reserved for game
+	[12545525] = "Im_Hiatus",
 }
-type LogCategory = "Notes"|"Bans"|"Kicks"
 
-local BannedPlayers : DataStore = game:GetService("DataStoreService"):GetDataStore("Banned_1_")
-local KickedPlayers : DataStore = game:GetService("DataStoreService"):GetDataStore("Kicked_1_")
-local PlayerNotes   : DataStore = game:GetService("DataStoreService"):GetDataStore("Notes_1_")
-
-local KickTypes = {
+local KickMessageFormats = {
 	error = "\n%s. \n(If this problem persists, please contact support)",
 	sus = "Suspicious activity detected: %s."
-}
-
-local Moderators : {[string|number] : string} = {
-	Server = "Server",
-	[12545525] = "Im_Hiatus"
 }
 
 local DEFAULT_KICK_REASON = "None"
 local DEFAULT_BAN_REASON = "None"
 local DEFAULT_UNBAN_REASON = "No reason given"
-local MAX_FETCH_ATTEMPTS = 10
 
-local function GetId(user : Player|number) : number?
+local MAX_PCALL_ATTEMPTS = 10
+type Subscription = "UpdateMods" | "KickPlayer" -- for MessagingService
+
+local MODS_DS_KEY = "Mods_1_"
+local BANS_DS_KEY = "Bans_1_"
+local KICKS_DS_KEY = "Kicks_1_"
+local NOTES_DS_KEY = "Notes_1_"
+--
+
+type Data = {[any] : any}
+type List = {[string] : string}
+type Message = {Data : any, Sent : number}
+
+type User = Player | number
+type LogCategory = "Notes"|"Bans"|"Kicks"
+
+local MessagingService = game:GetService("MessagingService")
+local Players = game:GetService("Players")
+local ServerId = (game:GetService("RunService"):IsStudio()) and "Studio" or game.JobId
+
+local ModerationStore : DataStore = game:GetService("DataStoreService"):GetDataStore("Moderation_1")
+local Moderators : List
+
+local function FetchData(key : string) : (Data, boolean)
+	if not key then warn("Must send a valid key! (Sent nil)") return {}, false end
+
+	local success, result
+
+	for attempt = 1, MAX_PCALL_ATTEMPTS do
+		success, result = pcall(function()
+			return ModerationStore:GetAsync(key)
+		end)
+
+		if success then return result or {}, success end
+	end
+
+	warn("Failed to retrieve data from Roblox servers. Please try again later. Problem:", result)
+	return {}, false
+end
+
+local function WriteToData(key : string, data : Data) : boolean
+	if not key then warn("Must send a valid key! (Sent nil)") return false end
+
+	local success, msg
+
+	for attempt = 1, MAX_PCALL_ATTEMPTS do
+		success, msg = pcall(function()
+			return ModerationStore:UpdateAsync(key, function(old)
+				return data
+			end)
+		end)
+
+		if success then return success end
+	end
+
+	warn("Failed to update data on Roblox servers. Please try again later. Problem:", msg)
+	return false
+end
+
+local function SubscribeToMessage(topic : Subscription, callback : (any) -> ()) : (RBXScriptConnection?, boolean)
+	if not topic or type(topic) ~= "string" then
+		warn("Please send a valid topic to subscribe to! Sent:", topic) return nil, false
+	end
+
+	local success, result
+
+	for attempt = 1, MAX_PCALL_ATTEMPTS do
+		success, result = pcall(function()
+			return MessagingService:SubscribeAsync(topic, callback)
+		end)
+
+		if success then return result, success end
+	end
+
+	warn(string.format("Failed to subscribe to %s. Please try again later. Error: %s", topic, result))
+	return nil, false
+end
+
+local function PublishMessage(topic : Subscription, message : any) : boolean
+	if not topic or type(topic) ~= "string" then
+		warn("Please send a valid topic to publish to! Sent:", topic) return false
+	end
+
+	local success, result
+
+	for attempt = 1, MAX_PCALL_ATTEMPTS do
+		success, result = pcall(function()
+			return MessagingService:PublishAsync(topic, message)
+		end)
+
+		if success then return true end
+	end
+
+	warn(string.format("Failed to publish to %s. Please try again later. Error: %s", topic, result))
+	return false
+end
+
+local function GetId(user : User) : number?
 	local id : number = if typeof(user) == "Instance" and user:IsA("Player") then user.UserId else user
 
 	if type(id) == "number" then
 		return id
 	else
-		warn("Must send a Player or UserId! Sent:", user) return
+		warn("Must send a Player or UserId! Sent:", user) return nil
 	end
 end
 
-local function IsModerator(moderator : string|Player) : string|boolean
+local function IsModerator(moderator : User) : string|boolean
+	if not Moderators then warn("Mod list has not been fetched yet (Call UpdateModerators())") return false end
 	if not moderator then warn("Must send a player! (Sent nil)") return false end
 
-	local mod
-	if typeof(moderator) == "Instance" and moderator:IsA("Player") then
-		mod = moderator.Name
-	elseif typeof(moderator) == "string" then
-		mod = moderator
+	local id = tostring(GetId(moderator)) -- number keys are stored as strings in datastores
+	if id == "nil" or not Moderators[id] then
+		warn(string.format("%s does not have permission to kick/ban users!", id)) return false
 	end
 
-	if not mod or not Moderators[mod] then
-		print("not mod")
-		return false, warn(string.format("%s does not have permission to kick/ban users!", mod or "__nil"))
-	end
-
-	return mod
-end
-
-local function FetchData(userId : number, datastore : DataStore) : {[any] : any}?
-	if not userId then warn("Must send a UserId! (Sent nil)") return end
-
-	local success, result
-	local attempt = 0
-
-	while not success and attempt < MAX_FETCH_ATTEMPTS do
-		attempt += 1
-
-		success, result = pcall(function()
-			return datastore:GetAsync(tostring(userId))
-		end)
-	end
-
-	if not success then warn("Failed to retrieve data from Roblox servers. Please try again later. Problem:", result) end
-	return success and result or nil
-end
-
-local function WriteToData(userId: number, datastore : DataStore, data : {any}) : boolean
-	if not userId then warn("Must send a UserId! (Sent nil)") return false end
-
-	local success, msg
-	local attempt = 0
-
-	while not success and attempt < MAX_FETCH_ATTEMPTS do
-		attempt += 1
-
-		success, msg = pcall(function()
-			return datastore:UpdateAsync(tostring(userId), function(old)
-				return data
-			end)
-		end)
-	end
-
-	if not success then warn("Failed to update data on Roblox servers. Please try again later. Problem:", msg) end
-	return success
+	return Moderators[id]
 end
 
 local Moderation = {}
 
-function Moderation.AddModerator(moderator : string|number|Player)
-	if not moderator then warn("Must send a valid user! Sent:", moderator) return end
+function Moderation.VerifyGameAccess(user : User) : boolean
+	local id = GetId(user)
+	if not id then return false end
 
-	if typeof(moderator) == "string" or typeof(moderator) == "number" then
-		Moderators[moderator] = tostring(moderator)
-	elseif typeof(moderator) == "Instance" then
-		local id = GetId(moderator)
-		if not id then return end
+	local key = BANS_DS_KEY .. tostring(id)
+	local ban_logs = FetchData(key)
+	local latest_log = ban_logs[1]
 
-		Moderators[id :: number] = moderator.Name
+	if not latest_log or not latest_log.Banned then
+		return true
+	elseif latest_log.Duration > 0 and os.time() > latest_log.TimeOfBan + latest_log.Duration then
+		Moderation.Unban(id :: number, -1, "Ban duration finished")
+		return true
+	elseif typeof(user) == "Instance" and user:IsA("Player") then
+		user:Kick(string.format("You are banned from this experience. Reason: %s", latest_log.Reason))
 	end
+
+	return false
 end
 
-function Moderation.RemoveModerator(moderator : string|number|Player)
-	if not moderator then warn("Must send a valid user! Sent:", moderator) return end
+function Moderation.AddModerator(new_moderator : User, moderator : User)
+	if not new_moderator then warn("Must send a valid user! Sent:", new_moderator) return end
+	if not IsModerator(moderator) then warn("Must send a valid moderator to grant others mod! Sent:", moderator) return end
+	
+	local added_mods, fetch_success = FetchData(MODS_DS_KEY)
+	if not fetch_success then return end
+	
+	local id : string
+	local name : string
 
-	local id = if typeof(moderator) == "Instance" then GetId(moderator) else moderator
+	if typeof(new_moderator) == "number" then
+		id = tostring(new_moderator)
+		name = id
 
-	Moderators[id :: string|number] = nil
+		added_mods[id] = name
+		Moderators[id] = name
+
+	elseif typeof(new_moderator) == "Instance" then
+		id = tostring(GetId(new_moderator))
+		if not id or id == "nil" then return end
+
+		name = new_moderator.Name
+
+		added_mods[id] = name
+		Moderators[id] = name
+	end
+
+	local update_success = WriteToData(MODS_DS_KEY, added_mods)
+	if not update_success then warn("Failed to update mod list datastore") return end
+
+	PublishMessage("UpdateMods", {
+		Action = "Add",
+		Mod = {Id = id, Name = name},
+		Server = ServerId
+	})
 end
 
-function Moderation.Note(user : number|Player, note : string, moderator : string|Player)
+function Moderation.RemoveModerator(old_moderator : User, moderator : User)
+	if not old_moderator then warn("Must send a valid user! Sent:", old_moderator) return end
+	if not IsModerator(moderator) then warn("Must send a valid moderator to grant others mod! Sent:", moderator) return end
+	
+	local added_mods, fetch_success = FetchData(MODS_DS_KEY)
+	if not fetch_success then return end
+
+	local id = tostring(GetId(old_moderator))
+	if not id or id == "nil" then return end
+	if not Moderators[id] then warn(id, "is not a moderator!") return end
+
+	added_mods[id] = nil
+	Moderators[id] = nil
+
+	local update_success = WriteToData(MODS_DS_KEY, added_mods)
+	if not update_success then warn("Failed to update mod list datastore") return end
+
+	PublishMessage("UpdateMods", {
+		Action = "Remove",
+		Mod = {Id = id},
+		Server = ServerId
+	})
+end
+
+function Moderation.UpdateModerators() : boolean?
+	local new_mod_list = {}
+
+	for id, name in pairs(DefaultModerators) do -- fill in the default mods (server setup)
+		if new_mod_list[tostring(id)] then continue end
+		new_mod_list[tostring(id)] = name
+	end
+
+	local added_mods, fetch_success = FetchData(MODS_DS_KEY)
+	if not fetch_success then warn("Failed to get list of mods added to the datastore") return false end
+
+	for id, name in pairs(added_mods) do
+		new_mod_list[id] = name
+	end
+
+	Moderators = new_mod_list
+	return true
+end
+
+function Moderation.GetModerators() : List
+	if not Moderators then Moderation.UpdateModerators() end
+	return Moderators
+end
+
+function Moderation.Note(user : User, moderator : User, note : string)
 	if not note or typeof(note) ~= "string" then warn("Must send a valid note! Sent:", note) return end
 
 	local mod = IsModerator(moderator)
@@ -125,7 +250,9 @@ function Moderation.Note(user : number|Player, note : string, moderator : string
 	local id = GetId(user)
 	if not id then return end
 
-	local notes = FetchData(id :: number, PlayerNotes) or {}
+	local key = NOTES_DS_KEY .. tostring(id)
+
+	local notes = FetchData(key)
 	table.insert(notes, 1, {
 		Date = os.date(),
 		Note = note,
@@ -133,53 +260,68 @@ function Moderation.Note(user : number|Player, note : string, moderator : string
 		Traceback = debug.traceback()
 	})
 
-	WriteToData(id :: number, PlayerNotes, notes)
+	WriteToData(key, notes)
+	print(string.format("added note to %d", id :: number))
 end
 
-function Moderation.GetLogs(user : number|Player, category : LogCategory?)
-	local id = GetId(user)
-	if not id then return end
+function Moderation.GetLogs(user : User, moderator : User, category : LogCategory?)
+	local mod = IsModerator(moderator)
+	if not mod then return end
+
+	local id = tostring(GetId(user))
+	if not id or id == "nil" then return end
 
 	if category == "Notes" then
-		return FetchData(id :: number, PlayerNotes) or {}
+		return FetchData(NOTES_DS_KEY .. id)
 	elseif category == "Kicks" then
-		return FetchData(id :: number, KickedPlayers) or {}
+		return FetchData(KICKS_DS_KEY .. id)
 	elseif category == "Bans" then
-		return FetchData(id :: number, BannedPlayers) or {}
+		return FetchData(BANS_DS_KEY .. id)
 	else
 		return {
-			Notes = FetchData(id :: number, PlayerNotes) or {},
-			Kicks = FetchData(id :: number, KickedPlayers) or {},
-			Bans = FetchData(id :: number, BannedPlayers) or {}
+			Notes = FetchData(NOTES_DS_KEY .. id),
+			Kicks = FetchData(KICKS_DS_KEY .. id),
+			Bans = FetchData(BANS_DS_KEY .. id)
 		}
 	end
 end
 
-function Moderation.Kick(player : Player, moderator : string|Player, reason : string?, format : string?)
-	if not player or typeof(player) ~= "Instance" or not player:IsA("Player") then
-		warn("Must send a player! Sent:", player) return
-	end
-
+function Moderation.Kick(user : User, moderator : User, reason : string?, format : string?)
 	local mod = IsModerator(moderator)
 	if not mod then return end
 
+	local id = GetId(user)
+	if not id then return end
+	
 	reason = reason or DEFAULT_KICK_REASON
-
-	local kick_logs = FetchData(player.UserId, KickedPlayers) or {}
+	
+	local key = KICKS_DS_KEY .. tostring(id)
+	local kick_logs = FetchData(key)
 	table.insert(kick_logs, 1, {
 		Date = os.date(),
-		Reason = string.format("%s (%s)", reason :: string, format or "General"),
-		Moderator = mod,
+		Reason = string.format("%s (%s)", reason :: string, format or "Unspecified"),
+		Moderator = mod :: string,
 		Traceback = debug.traceback()
 	})
 
-	WriteToData(player.UserId, KickedPlayers, kick_logs)
-	player:Kick(string.format(KickTypes[format] or "%s", reason :: string))
+	WriteToData(key, kick_logs)
+
+	local player = Players:GetPlayerByUserId(id)
+	if player then
+		player:Kick(string.format(KickMessageFormats[format] or "%s", reason :: string))
+		print(id, "has been kicked from the game")
+	else
+		print("finding player in other servers...")
+		PublishMessage("KickPlayer", {
+			UserId = id,
+			Reason = reason,
+			Format = format
+		})
+	end
 end
 
-function Moderation.Ban(user : number|Player, moderator : string|Player, duration : number, reason : string?)
+function Moderation.Ban(user : User, moderator : User, duration : number, reason : string?)
 	-- duration : seconds
-	if not user then warn("Must send a user! (Sent nil)") return end
 	if not duration or type(duration) ~= "number" then warn("Duration must be a number! Sent:", duration) return end
 
 	local mod = IsModerator(moderator)
@@ -189,66 +331,88 @@ function Moderation.Ban(user : number|Player, moderator : string|Player, duratio
 	if not id then return end
 
 	reason = reason or DEFAULT_BAN_REASON
-
-	local ban_logs : {any} = FetchData(id :: number, BannedPlayers) or {}
+	
+	local key = BANS_DS_KEY .. tostring(id)
+	local ban_logs = FetchData(key)
 	if ban_logs[1] and ban_logs[1].Banned then warn(user, "already banned!") return end
-
+	
 	table.insert(ban_logs, 1, {
 		Banned = true,
 		Date = os.date(),
 		Reason = reason,
-		Moderator = mod,
+		Moderator = mod :: string,
 		Traceback = debug.traceback(),
 		TimeOfBan = os.time(),
 		Duration = math.round(duration),
 	})
 
-	WriteToData(id :: number, BannedPlayers, ban_logs)
+	WriteToData(key, ban_logs)
+	Moderation.Kick(id :: number, -1, reason)
 
-	if typeof(user) == "Instance" and user:IsA("Player") then
-		user:Kick(reason)
-	end
+	print(id, "has been banned from the game")
 end
 
-function Moderation.Unban(id : number, moderator : string|Player, reason : string?)
-	if type(id) ~= "number" then warn("Must send a UserId") return end
+function Moderation.Unban(id : number, moderator : User, reason : string?)
+	if type(id) ~= "number" then warn("Must send a valid UserId to unban!", id) return end
 
 	local mod = IsModerator(moderator)
 	if not mod then return end
 
 	reason = reason or DEFAULT_UNBAN_REASON
-
-	local ban_logs = FetchData(id :: number, BannedPlayers) or {}
+	
+	local key = BANS_DS_KEY .. tostring(id)
+	local ban_logs = FetchData(key)
+	
+	if ban_logs[1] and not ban_logs[1].Banned then warn(id, "already unbanned") return end
+	
 	table.insert(ban_logs, 1, {
 		Banned = false,
 		Date = os.date(),
 		Reason = reason,
-		Moderator = mod,
+		Moderator = mod :: string,
 		Traceback = debug.traceback()
 	})
 
-	WriteToData(id :: number, BannedPlayers, ban_logs)
+	WriteToData(key, ban_logs)
+	print(id, "has been unbanned")
 end
 
-function Moderation.VerifyGameAccess(user : number|Player) : boolean
-	if not user then warn("Must send a user! (Sent nil)") return false end
-
-	local id = GetId(user)
-	if not id then return false end
-
-	local ban_logs = FetchData(id :: number, BannedPlayers)
-	local latest_log = ban_logs and ban_logs[1]
-
-	if not latest_log or not latest_log.Banned then
-		return true
-	elseif latest_log.Duration > 0 and os.time() > latest_log.TimeOfBan + latest_log.Duration then
-		Moderation.Unban(id :: number, "Server", "Ban duration finished")
-		return true
-	elseif typeof(user) == "Instance" and user:IsA("Player") then
-		user:Kick(string.format("You are banned from this experience. Reason: %s", latest_log.Reason))
+-- Required
+Moderation.UpdateModerators()
+SubscribeToMessage("UpdateMods", function(message : Message)
+	if not message or type(message.Data) ~= "table" then warn("No valid update has been received:", message) return end
+	if message.Data.Server == ServerId then return end
+	
+	local mod = message.Data.Mod
+	
+	if message.Data.Action == "Add" then
+		Moderators[mod.Id] = mod.Name
+	elseif message.Data.Action == "Remove" then
+		Moderators[mod.Id] = nil
 	end
+	
+	print("updated mods")
+end)
 
-	return false
-end
+SubscribeToMessage("KickPlayer", function(message : Message)
+	if not message or type(message.Data) ~= "table" then warn("Received no valid id to kick") return end
+	
+	local id = message.Data.UserId
+	local reason = message.Data.Reason or DEFAULT_KICK_REASON
+	local format = message.Data.Format
+	
+	if type(id) ~= "number" then warn("Please send a valid UserId. Sent:", id) return end
+	if type(reason) ~= "string" then warn("Please send a valid reason! Sent:", reason) return end
+	if format and type(format) ~= "string" then warn("Please send a valid format! Sent:", format) return end
+	
+	local player = Players:GetPlayerByUserId(id)
+	if player then
+		player:Kick(string.format(KickMessageFormats[format] or "%s", reason))
+		print(player.UserId, "has been kicked from the game")
+	else
+		--print(string.format("could not find %d in this server (%s)", id, ServerId))
+	end
+end)
+--
 
 return Moderation
