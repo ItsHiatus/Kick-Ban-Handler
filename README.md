@@ -45,7 +45,8 @@ Moderation.GetModerators() : {[UserId] : string}
 
 ```lua
 Moderation.UpdateModerators()
---	Resyncs the 'Moderators' table with the 'DefaultModerators' and the moderators added using Moderation.AddModerator()
+--	Resyncs the 'Moderators' table with the 'DefaultModerators'
+--	and the moderators added using Moderation.AddModerator()
 ```
 
 ```lua
