@@ -1,5 +1,5 @@
 --!strict
--- Credits to Hiatus/ApprenticeOfMadara
+-- Credits to Hiatus / ApprenticeOfMadara
 -- Settings
 local DefaultModerators : {string} = {
 	[-1] = "Server", -- id -1 is reserved for game
@@ -156,7 +156,31 @@ function Moderation.VerifyGameAccess(user : User) : boolean
 	return false
 end
 
-function Moderation.AddModerator(new_moderator : User, moderator : User)
+function Moderation.UpdateModerators() : boolean?
+	local new_mod_list = {}
+
+	for id, name in pairs(DefaultModerators) do -- fill in the default mods (server setup)
+		if new_mod_list[id] then continue end
+		new_mod_list[id] = name
+	end
+
+	local added_mods, fetch_success = FetchData(MODS_DS_KEY)
+	if not fetch_success then warn("Failed to get list of mods added to the datastore") return false end
+	
+	for id, name in pairs(added_mods) do
+		new_mod_list[tonumber(id) :: number] = name -- keys saved as strings cos they're not in numerical order
+	end
+
+	Moderators = new_mod_list
+	return true
+end
+
+function Moderation.GetModerators() : List
+	if not Moderators then Moderation.UpdateModerators() end
+	return Moderators
+end
+
+function Moderation.AddModerator(moderator : User, new_moderator : User)
 	if not new_moderator then warn("Must send a valid user! Sent:", new_moderator) return end
 	if not IsModerator(moderator) then warn("Must send a valid moderator to grant others mod! Sent:", moderator) return end
 	
@@ -170,7 +194,7 @@ function Moderation.AddModerator(new_moderator : User, moderator : User)
 		id = new_moderator
 		name = tostring(id)
 
-		added_mods[id] = name
+		added_mods[name] = name -- store string to avoid datastore mixed keys rule (unordered number keys)
 		Moderators[id] = name
 
 	elseif typeof(new_moderator) == "Instance" then
@@ -179,7 +203,7 @@ function Moderation.AddModerator(new_moderator : User, moderator : User)
 
 		name = new_moderator.Name
 
-		added_mods[id] = name
+		added_mods[(tostring(id))] = name -- store string to avoid datastore mixed keys rule (unordered number keys)
 		Moderators[id] = name
 	end
 
@@ -193,18 +217,18 @@ function Moderation.AddModerator(new_moderator : User, moderator : User)
 	})
 end
 
-function Moderation.RemoveModerator(old_moderator : User, moderator : User)
+function Moderation.RemoveModerator(moderator : User, old_moderator : User)
 	if not old_moderator then warn("Must send a valid user! Sent:", old_moderator) return end
-	if not IsModerator(moderator) then warn("Must send a valid moderator to grant others mod! Sent:", moderator) return end
+	if not IsModerator(moderator) then warn("Must send a valid moderator to remove mod! Sent:", moderator) return end
+	
+	local id = GetId(old_moderator) :: number
+	if not id then return end
+	if not Moderators[id] then warn(id, "is not a moderator!") return end
 	
 	local added_mods, fetch_success = FetchData(MODS_DS_KEY)
 	if not fetch_success then return end
 
-	local id = GetId(old_moderator) :: number
-	if not id then return end
-	if not Moderators[id] then warn(id, "is not a moderator!") return end
-
-	added_mods[id] = nil
+	added_mods[tostring(id)] = nil -- keys saved as strings cos they're not in numerical order
 	Moderators[id] = nil
 
 	local update_success = WriteToData(MODS_DS_KEY, added_mods)
@@ -217,31 +241,7 @@ function Moderation.RemoveModerator(old_moderator : User, moderator : User)
 	})
 end
 
-function Moderation.UpdateModerators() : boolean?
-	local new_mod_list = {}
-
-	for id, name in pairs(DefaultModerators) do -- fill in the default mods (server setup)
-		if new_mod_list[id] then continue end
-		new_mod_list[id] = name
-	end
-
-	local added_mods, fetch_success = FetchData(MODS_DS_KEY)
-	if not fetch_success then warn("Failed to get list of mods added to the datastore") return false end
-
-	for id, name in pairs(added_mods) do
-		new_mod_list[id] = name
-	end
-
-	Moderators = new_mod_list
-	return true
-end
-
-function Moderation.GetModerators() : List
-	if not Moderators then Moderation.UpdateModerators() end
-	return Moderators
-end
-
-function Moderation.Note(user : User, moderator : User, note : string)
+function Moderation.Note(moderator : User, user : User, note : string)
 	if not note or typeof(note) ~= "string" then warn("Must send a valid note! Sent:", note) return end
 
 	local mod = IsModerator(moderator)
@@ -264,7 +264,7 @@ function Moderation.Note(user : User, moderator : User, note : string)
 	print(string.format("added note to %d", id))
 end
 
-function Moderation.GetLogs(user : User, moderator : User, category : LogCategory?)
+function Moderation.GetLogs(moderator : User, user : User, category : LogCategory?)
 	local mod = IsModerator(moderator)
 	if not mod then return end
 
@@ -286,7 +286,7 @@ function Moderation.GetLogs(user : User, moderator : User, category : LogCategor
 	end
 end
 
-function Moderation.Kick(user : User, moderator : User, reason : string?, format : string?)
+function Moderation.Kick(moderator : User, user : User, reason : string?, format : string?)
 	local mod = IsModerator(moderator)
 	if not mod then return end
 
@@ -320,7 +320,7 @@ function Moderation.Kick(user : User, moderator : User, reason : string?, format
 	end
 end
 
-function Moderation.Ban(user : User, moderator : User, duration : number, reason : string?)
+function Moderation.Ban(moderator : User, user : User, duration : number, reason : string?)
 	-- duration : seconds
 	if not duration or type(duration) ~= "number" then warn("Duration must be a number! Sent:", duration) return end
 
@@ -352,7 +352,7 @@ function Moderation.Ban(user : User, moderator : User, duration : number, reason
 	print(id, "has been banned from the game")
 end
 
-function Moderation.Unban(id : number, moderator : User, reason : string?)
+function Moderation.Unban(moderator : User, id : number,  reason : string?)
 	if type(id) ~= "number" then warn("Must send a valid UserId to unban!", id) return end
 
 	local mod = IsModerator(moderator)
@@ -390,8 +390,6 @@ SubscribeToMessage("UpdateMods", function(message : Message)
 	elseif message.Data.Action == "Remove" then
 		Moderators[mod.Id] = nil
 	end
-	
-	print("updated mods")
 end)
 
 SubscribeToMessage("KickPlayer", function(message : Message)
